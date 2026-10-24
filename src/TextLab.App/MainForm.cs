@@ -54,6 +54,7 @@ internal sealed class MainForm : Form
         var note = Theme.Label("离线优先\n\nUTF-8 / GB18030\n\n词典 · 向量 · 文件", 9, Theme.Muted); note.Dock = DockStyle.None; note.Size = new Size(150, 180); note.Margin = new Padding(8, 35, 0, 0); note.TextAlign = ContentAlignment.TopLeft; nav.Controls.Add(note);
         root.Controls.Add(nav, 0, 1); root.SetRowSpan(nav, 2); root.Controls.Add(_workspace, 1, 1); _status.Padding = new Padding(24, 0, 0, 0); root.Controls.Add(_status, 1, 2); Controls.Add(root);
         _pages = [SegmentPage(), ProofPage(), SearchPage()]; Navigate(0);
+        _proofDetails.Font = Theme.Font(10.5f); _searchPreview.Font = Theme.Font(10.5f);
         _segmentInput.TextChanged += (_, _) => SegmentChanged(); _segmentMode.SelectedIndexChanged += (_, _) => SegmentChanged();
         Shown += async (_, _) => await InitializeShowcase(); FormClosing += (_, _) => _job?.Cancel();
     }
@@ -107,7 +108,7 @@ internal sealed class MainForm : Form
         var apply = Theme.Button("应用所选建议", false, 135); apply.Click += async (_, _) => await ApplyIssue(); toolbar.Controls.Add(apply);
         var open = Theme.Button("打开文本", false, 102); open.Click += async (_, _) => await OpenText(_proofInput); toolbar.Controls.Add(open);
         var save = Theme.Button("保存文本", false, 102); save.Click += (_, _) => SaveText(_proofInput.Text, "reviewed.txt"); toolbar.Controls.Add(save); table.Controls.Add(toolbar, 0, 1);
-        var split = Columns(59); var left = Rows((SizeType.Percent, 54), (SizeType.Percent, 46)); left.Controls.Add(Theme.Card("待校对文本", _proofInput), 0, 0); left.Controls.Add(Theme.Card("固定用语建议", _issuesGrid, $"内置 {Proofreader.Rules.Count} 条人工整理规则；仅匹配明确的固定用语。"), 0, 1); split.Controls.Add(left, 0, 0);
+        var split = Columns(59); var left = Rows((SizeType.Percent, 45), (SizeType.Percent, 55)); left.Controls.Add(Theme.Card("待校对文本", _proofInput), 0, 0); left.Controls.Add(Theme.Card("固定用语建议", _issuesGrid, $"内置 {Proofreader.Rules.Count} 条人工整理规则；仅匹配明确的固定用语。"), 0, 1); split.Controls.Add(left, 0, 0);
         var right = Rows((SizeType.Percent, 40), (SizeType.Percent, 60)); right.Controls.Add(Theme.Card("建议依据", _proofDetails), 0, 0);
         var model = Rows((SizeType.Absolute, 30), (SizeType.Absolute, 48), (SizeType.Absolute, 44), (SizeType.Percent, 100), (SizeType.Absolute, 44)); model.Controls.Add(_modelLabel, 0, 0);
         var buttons = Theme.Toolbar(); var load = Theme.Button("导入 word2vec", false, 150); load.Click += async (_, _) => await LoadModel(); buttons.Controls.Add(load); var unload = Theme.Button("卸载", false, 70); unload.Click += (_, _) => { _model = null; _modelLabel.Text = "未加载词向量模型"; _vectorGrid.Rows.Clear(); }; buttons.Controls.Add(unload); model.Controls.Add(buttons, 0, 1);
@@ -127,6 +128,7 @@ internal sealed class MainForm : Form
         pathRow.Controls.Add(Theme.Label("目录", 10, Theme.Muted), 0, 0); pathRow.Controls.Add(_path, 1, 0); var browse = Theme.Button("选择", false, 85); browse.Click += (_, _) => { using var dialog = new FolderBrowserDialog(); if (dialog.ShowDialog(this) == DialogResult.OK) _path.Text = dialog.SelectedPath; }; pathRow.Controls.Add(browse, 2, 0); _encoding.Dock = DockStyle.Fill; pathRow.Controls.Add(_encoding, 3, 0); table.Controls.Add(pathRow, 0, 1);
         var searchRow = Theme.Toolbar(); _keyword.Width = 200; _keyword.Dock = DockStyle.None; _keyword.PlaceholderText = "关键词"; searchRow.Controls.Add(_keyword); var start = Theme.Button("开始检索", true, 110); start.Click += async (_, _) => await Search(); searchRow.Controls.Add(start); searchRow.Controls.Add(_ignoreCase);
         _extensions.Width = 200; _extensions.Dock = DockStyle.None; searchRow.Controls.Add(_extensions); var mb = Theme.Label("MiB/文件", 8, Theme.Muted); mb.Dock = DockStyle.None; mb.Size = new Size(70, 38); searchRow.Controls.Add(mb); searchRow.Controls.Add(_maxMb); var hits = Theme.Label("行上限", 8, Theme.Muted); hits.Dock = DockStyle.None; hits.Size = new Size(55, 38); searchRow.Controls.Add(hits); searchRow.Controls.Add(_maxHits); table.Controls.Add(searchRow, 0, 2);
+        searchRow.WrapContents = true; searchRow.SizeChanged += (_, _) => { float height = searchRow.Width < 1080 ? 92 : 48; if (table.RowStyles[2].Height != height) table.RowStyles[2].Height = height; };
         table.Controls.Add(Theme.Card("匹配结果", _hitsGrid, "一个匹配行显示一次；双击可在预览中查看，原始文件保持只读。"), 0, 3);
         var preview = Rows((SizeType.Percent, 100), (SizeType.Absolute, 44)); preview.Controls.Add(_searchPreview, 0, 0); var actions = Theme.Toolbar(); var export = Theme.Button("导出结果 JSON", false, 150); export.Click += (_, _) => { if (_search is null) { SetStatus("请先完成一次搜索"); return; } SaveText(JsonSerializer.Serialize(_search, new JsonSerializerOptions { WriteIndented = true }), "search-results.json"); }; actions.Controls.Add(export); var openFolder = Theme.Button("打开所在目录", false, 135); openFolder.Click += (_, _) => { if (SelectedHit() is FileHit hit && Directory.Exists(Path.GetDirectoryName(hit.Path))) Process.Start(new ProcessStartInfo("explorer.exe", Path.GetDirectoryName(hit.Path)!) { UseShellExecute = true }); }; actions.Controls.Add(openFolder); preview.Controls.Add(actions, 0, 1); table.Controls.Add(Theme.Card("只读预览", preview), 0, 4);
         _hitsGrid.VirtualMode = true; _hitsGrid.CellValueNeeded += (_, e) =>
@@ -198,7 +200,7 @@ internal sealed class MainForm : Form
     }
     private void SelectIssue()
     {
-        if (_issuesGrid.CurrentRow?.Tag is not CorrectionIssue issue) return; _proofDetails.Text = $"{issue.Original}  →  {issue.Suggestion}\n\n{issue.Reason}\n\n来源：人工固定用语规则\n位置：第 {issue.Start + 1} 个 UTF-16 字符\n\n原文会保留，直到你应用建议。"; _proofInput.Select(issue.Start, issue.Length);
+        if (_issuesGrid.CurrentRow?.Tag is not CorrectionIssue issue) return; _proofDetails.Text = $"{issue.Original}  →  {issue.Suggestion}\n\n{issue.Reason}\n规则建议 · 位置 {issue.Start + 1}\n\n点击“应用所选建议”确认替换。"; _proofInput.Select(issue.Start, issue.Length);
     }
     private async Task ApplyIssue()
     {
@@ -228,7 +230,7 @@ internal sealed class MainForm : Form
     {
         if (SelectedHit() is not FileHit hit) return;
         // Only the captured matching line is previewed; selecting a result never loads arbitrary large files.
-        _searchPreview.Text = $"{hit.Path}\n行 {hit.Line}  ·  {hit.Encoding}  ·  本行出现 {hit.Occurrences} 次\n\n{hit.Snippet}";
+        _searchPreview.Text = $"{Path.GetRelativePath(_searchRoot, hit.Path)}\n行 {hit.Line}  ·  {hit.Encoding}  ·  本行出现 {hit.Occurrences} 次\n\n{hit.Snippet}";
         int start = _searchPreview.Text.IndexOf(hit.Snippet, StringComparison.Ordinal); if (start >= 0) { _searchPreview.Select(start, hit.Snippet.Length); _searchPreview.SelectionColor = Theme.Accent; _searchPreview.Select(0, 0); }
     }
     private FileHit? SelectedHit() => _search is not null && _hitsGrid.CurrentRow is { Index: >= 0 } row && row.Index < _search.Hits.Count ? _search.Hits[row.Index] : null;
