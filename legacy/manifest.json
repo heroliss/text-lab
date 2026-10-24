@@ -1,0 +1,68 @@
+[
+  {
+    "source": "2016年\\2016.10.31改错字\\源码\\gaicuozi\\WordVectors.cs",
+    "archived": "legacy\\2016-proofreading\\WordVectors.cs",
+    "sha256": "c7cdab6a0510a46233e2367a5eacbd44c888d8aa52d584f1c294896cd22658a2",
+    "bytes": 11081
+  },
+  {
+    "source": "2016年\\2016.10.31改错字\\源码\\gaicuozi\\MarkedText.cs",
+    "archived": "legacy\\2016-proofreading\\MarkedText.cs",
+    "sha256": "59641121f5676f2c1a824400acdeb3e16a889fd609d9e5a3b4599620c3bc4bc3",
+    "bytes": 10021
+  },
+  {
+    "source": "2016年\\2016.10.31改错字\\源码\\gaicuozi\\Form1.cs",
+    "archived": "legacy\\2016-proofreading\\Form1.cs",
+    "sha256": "94ad5b58d9c0bee8037353eed0d9cb5ae2841a12ad76389ea7c7504b56f639e4",
+    "bytes": 16462
+  },
+  {
+    "source": "2016年\\2016.10.31改错字\\源码\\gaicuozi\\ColorConverter.cs",
+    "archived": "legacy\\2016-proofreading\\ColorConverter.cs",
+    "sha256": "a1ad3e8804406ecc19ec46c9107d202a5ff39327bb51eb54374e92c0572cb982",
+    "bytes": 4880
+  },
+  {
+    "source": "2016年\\分词工具\\分词工具\\分词工具\\Form1.cs",
+    "archived": "legacy\\2016-segmentation\\Form1.cs",
+    "sha256": "6140d25df580af86ebaafec640879ddcfede06840c4975be6a10c41ecd7ad729",
+    "bytes": 8367
+  },
+  {
+    "source": "2016年\\分词工具\\分词工具\\分词工具\\ParagraphProcess.cs",
+    "archived": "legacy\\2016-segmentation\\ParagraphProcess.cs",
+    "sha256": "02276e4d6059d8e7831084de85e3b76bfb9a501f180743b8027433ad08287284",
+    "bytes": 3561
+  },
+  {
+    "source": "2016年\\FindText1.0\\FindText\\Program.cs",
+    "archived": "legacy\\2016-findtext\\Program.cs",
+    "sha256": "9f3781c7343544a69d99c017408bd8457144adf7cc3f4bc5f954cd44338f30dd",
+    "bytes": 12138
+  },
+  {
+    "source": "2015年\\分词程序 - 原版\\分词程序\\分词类.cs",
+    "archived": "legacy\\2015-segmentation-original\\分词类.cs",
+    "sha256": "ed053f76790a609096779aa1aef64c8fd9e56afe57503084d48b157bb7ab2fef",
+    "bytes": 22813
+  },
+  {
+    "source": "2015年\\分词程序 - 原版\\分词程序\\Form1.cs",
+    "archived": "legacy\\2015-segmentation-original\\Form1.cs",
+    "sha256": "37cf76f69da1f8a87d9d9469b242944aa2fa6536222a9ffec106e39aba748732",
+    "bytes": 20111
+  },
+  {
+    "source": "2015年\\分词程序 - web版\\分词程序\\分词类.cs",
+    "archived": "legacy\\2015-segmentation-web\\分词类.cs",
+    "sha256": "ed053f76790a609096779aa1aef64c8fd9e56afe57503084d48b157bb7ab2fef",
+    "bytes": 22813
+  },
+  {
+    "source": "2015年\\分词程序 - web版\\分词程序\\Form1.cs",
+    "archived": "legacy\\2015-segmentation-web\\Form1.cs",
+    "sha256": "b5530eced9cf2c8d21ccee29ef9c9efa63bc5435e32837a242afead7321eb4ac",
+    "bytes": 21064
+  }
+]
