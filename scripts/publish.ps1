@@ -8,6 +8,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
 Copy-Item -LiteralPath (Join-Path $taskRoot 'README.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $taskRoot 'THIRD-PARTY-NOTICES.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $taskRoot 'licenses') -Destination $output -Recurse
+if (Test-Path -LiteralPath (Join-Path $taskRoot 'docs')) { Copy-Item -LiteralPath (Join-Path $taskRoot 'docs') -Destination $output -Recurse }
 $zip = "$output.zip"
 Compress-Archive -Path (Join-Path $output '*') -DestinationPath $zip
 [pscustomobject]@{ version = $Version; exe = (Join-Path $output 'Liss.TextLab.exe'); zip = $zip; bytes = (Get-Item -LiteralPath $zip).Length; sha256 = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskRoot 'artifacts\release-manifest.json') -Encoding utf8
