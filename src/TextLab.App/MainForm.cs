@@ -22,9 +22,9 @@ internal sealed class MainForm : Form
     private readonly ComboBox _segmentMode = Theme.Combo("精确模式", "搜索模式", "全模式"), _encoding = Theme.Combo("自动识别编码", "UTF-8", "GB18030", "UTF-16 LE");
     private readonly TextBox _customWord = Theme.Input(), _vectorQuery = Theme.Input("算法 游戏开发"), _path = Theme.Input(), _keyword = Theme.Input("算法"), _extensions = Theme.Input(".txt,.md,.cs,.cpp,.h,.json,.csv,.log");
     private readonly Label _modelLabel = Theme.Label("未加载词向量模型", 9.5f, Theme.Muted), _segmentNote = Theme.Label("Jieba · DAG + 动态规划 + HMM", 9, Theme.Muted);
-    private readonly FlowLayoutPanel _chips = new() { Dock = DockStyle.Fill, BackColor = Theme.Surface, AutoScroll = true, Padding = new Padding(0, 4, 0, 4) };
+    private readonly FlowLayoutPanel _chips = new() { Dock = DockStyle.Fill, BackColor = Theme.Surface, AutoScroll = true, Padding = new Padding(0, 4, 20, 4) };
     private readonly FrequencyBars _bars = new();
-    private readonly DataGridView _frequencyGrid = Theme.Grid(("word", "词语", 55), ("count", "次数", 20), ("start", "首次位置", 25));
+    private readonly DataGridView _frequencyGrid = Theme.Grid(("word", "词语", 55), ("count", "次数", 20), ("start", "位置", 25));
     private readonly DataGridView _issuesGrid = Theme.Grid(("original", "原文", 22), ("suggestion", "建议", 22), ("position", "位置", 14), ("type", "类型", 22));
     private readonly DataGridView _vectorGrid = Theme.Grid(("word", "参考词", 60), ("similarity", "余弦相似度", 40));
     private readonly DataGridView _hitsGrid = Theme.Grid(("file", "文件", 31), ("line", "行", 8), ("snippet", "匹配内容", 47), ("encoding", "编码", 14));
@@ -41,7 +41,7 @@ internal sealed class MainForm : Form
 
     public MainForm(string[] args)
     {
-        _args = args; Text = "LISS / Text Lab 1.0 — 文字处理实验室"; ClientSize = new Size(1336, 864); MinimumSize = new Size(1120, 760); BackColor = Theme.Background; ForeColor = Theme.Text; Font = Theme.Font(); StartPosition = FormStartPosition.CenterScreen;
+        _args = args; Text = "LISS / Text Lab 1.0 — 文字处理实验室"; ClientSize = new Size(1380, 920); MinimumSize = new Size(1120, 760); BackColor = Theme.Background; ForeColor = Theme.Text; Font = Theme.Font(); StartPosition = FormStartPosition.CenterScreen;
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Margin = Padding.Empty, Padding = Padding.Empty };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 182)); root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 76)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
@@ -144,12 +144,26 @@ internal sealed class MainForm : Form
     private async Task Job(string title, Func<CancellationToken, Task> action)
     {
         if (_job is not null) { SetStatus("已有任务在运行。可以先取消当前任务。"); return; }
-        using var cancellation = new CancellationTokenSource(); _job = cancellation; _cancel.Enabled = true; _workspace.Enabled = false; foreach (var button in _navigation) button.Enabled = false; SetStatus(title + "…");
+        using var cancellation = new CancellationTokenSource(); _job = cancellation; _cancel.Enabled = true; var locks = LockInputs(); foreach (var button in _navigation) button.Enabled = false; SetStatus(title + "…");
         var watch = Stopwatch.StartNew();
         try { await action(cancellation.Token); SetStatus(_status.Text + $"  ·  {watch.Elapsed.TotalMilliseconds:N0} ms"); }
         catch (OperationCanceledException) { SetStatus("已取消 · 已完成的文件保留"); }
         catch (Exception e) { ShowError(e); }
-        finally { _job = null; _cancel.Enabled = false; _workspace.Enabled = true; foreach (var button in _navigation) button.Enabled = true; }
+        finally { _job = null; _cancel.Enabled = false; foreach (var restore in locks) restore(); foreach (var button in _navigation) button.Enabled = true; }
+    }
+    private List<Action> LockInputs()
+    {
+        var restore = new List<Action>();
+        void Visit(Control parent)
+        {
+            foreach (Control control in parent.Controls)
+            {
+                if (control is TextBoxBase text) { bool value = text.ReadOnly; text.ReadOnly = true; restore.Add(() => text.ReadOnly = value); }
+                else if (control is Button or ComboBox or NumericUpDown) { bool value = control.Enabled; control.Enabled = false; restore.Add(() => control.Enabled = value); }
+                else Visit(control);
+            }
+        }
+        Visit(_workspace); return restore;
     }
     private async Task Segment()
     {

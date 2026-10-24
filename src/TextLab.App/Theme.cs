@@ -11,7 +11,7 @@ internal static class Theme
     public static Label Label(string text, float size = 10, Color? color = null, FontStyle style = FontStyle.Regular) => new() { Text = text, ForeColor = color ?? Text, Font = Font(size, style), AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
     public static Button Button(string text, bool primary = false, int width = 110)
     {
-        var button = new Button { Text = text, Width = width, Height = 38, FlatStyle = FlatStyle.Flat, BackColor = primary ? Accent : Raised, ForeColor = primary ? Background : Text,
+        var button = new ReadableButton { Text = text, Width = width, Height = 38, FlatStyle = FlatStyle.Flat, BackColor = primary ? Accent : Raised, ForeColor = primary ? Background : Text,
             Font = Font(9.5f, FontStyle.Bold), Margin = new Padding(0, 4, 8, 4), Cursor = Cursors.Hand, UseVisualStyleBackColor = false };
         button.FlatAppearance.BorderColor = primary ? Accent : Border; button.FlatAppearance.MouseOverBackColor = primary ? Color.FromArgb(119, 240, 223) : Color.FromArgb(38, 54, 73); return button;
     }
@@ -20,7 +20,8 @@ internal static class Theme
         Font = Font(12), Dock = DockStyle.Fill, DetectUrls = false, HideSelection = false, Margin = new Padding(12), WordWrap = true };
     public static ComboBox Combo(params string[] choices)
     {
-        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Raised, ForeColor = Text, FlatStyle = FlatStyle.Flat, Font = Font(10), Width = 160, Margin = new Padding(0, 7, 8, 6) };
+        var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 25, BackColor = Raised, ForeColor = Text, FlatStyle = FlatStyle.Flat, Font = Font(10), Width = 160, Margin = new Padding(0, 7, 8, 6) };
+        combo.DrawItem += (_, e) => { using var brush = new SolidBrush(Raised); e.Graphics.FillRectangle(brush, e.Bounds); string text = e.Index >= 0 ? combo.Items[e.Index]?.ToString() ?? "" : combo.Text; TextRenderer.DrawText(e.Graphics, text, combo.Font, e.Bounds, combo.Enabled ? Text : Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis); e.DrawFocusRectangle(); };
         combo.Items.AddRange(choices); combo.SelectedIndex = 0; return combo;
     }
     public static DataGridView Grid(params (string Name, string Header, float Width)[] columns)
@@ -30,7 +31,7 @@ internal static class Theme
             GridColor = Border, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal, ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None, Font = Font(9.5f), RowTemplate = { Height = 34 } };
         grid.DefaultCellStyle = new DataGridViewCellStyle { BackColor = Surface, ForeColor = Text, SelectionBackColor = Raised, SelectionForeColor = Accent, Padding = new Padding(8, 3, 4, 3) };
         grid.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(19, 30, 44) };
-        grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Raised, ForeColor = Muted, Font = Font(9, FontStyle.Bold), Padding = new Padding(8) };
+        grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Raised, ForeColor = Muted, Font = Font(9, FontStyle.Bold), Padding = new Padding(4) };
         grid.ColumnHeadersHeight = 38;
         foreach (var column in columns) grid.Columns.Add(new DataGridViewTextBoxColumn { Name = column.Name, HeaderText = column.Header, FillWeight = column.Width, SortMode = DataGridViewColumnSortMode.NotSortable });
         return grid;
@@ -45,6 +46,14 @@ internal static class Theme
         panel.Controls.Add(table); return panel;
     }
     public static FlowLayoutPanel Toolbar() => new() { Dock = DockStyle.Fill, BackColor = Background, WrapContents = false, Padding = new Padding(0, 2, 0, 2) };
+    private sealed class ReadableButton : Button
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e); if (Enabled) return; using var fill = new SolidBrush(Raised); e.Graphics.FillRectangle(fill, new Rectangle(1, 1, Math.Max(0, Width - 2), Math.Max(0, Height - 2)));
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+    }
 }
 
 internal sealed class FrequencyBars : Control
@@ -56,8 +65,8 @@ internal sealed class FrequencyBars : Control
     {
         base.OnPaint(e); var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; using var font = Theme.Font(9); using var muted = new SolidBrush(Theme.Muted); using var text = new SolidBrush(Theme.Text);
         if (_items.Count == 0) { g.DrawString("分词后显示高频词分布", font, muted, 8, 10); return; }
-        float row = Math.Min(30, Height / (float)_items.Count); int max = _items.Max(x => x.Count); int labelWidth = Math.Min(120, Width / 3);
-        for (int i = 0; i < _items.Count; i++)
+        int visible = Math.Min(_items.Count, Math.Max(1, Height / 25)); float row = Math.Min(30, Height / (float)visible); int max = _items.Max(x => x.Count); int labelWidth = Math.Min(120, Width / 3);
+        for (int i = 0; i < visible; i++)
         {
             float y = i * row + 3; g.DrawString(_items[i].Word, font, text, new RectangleF(0, y, labelWidth, row));
             using var bg = new SolidBrush(Theme.Raised); using var fill = new SolidBrush(i % 2 == 0 ? Theme.Accent : Theme.Blue);
