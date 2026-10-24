@@ -35,6 +35,7 @@ internal sealed class MainForm : Form
     private SegmentResult? _segments;
     private ProofreadResult? _proof;
     private SearchSummary? _search;
+    private string _searchRoot = "";
     private int _page;
     private bool _loadingProof;
 
@@ -53,6 +54,7 @@ internal sealed class MainForm : Form
         var note = Theme.Label("离线优先\n\nUTF-8 / GB18030\n\n词典 · 向量 · 文件", 9, Theme.Muted); note.Dock = DockStyle.None; note.Size = new Size(150, 180); note.Margin = new Padding(8, 35, 0, 0); note.TextAlign = ContentAlignment.TopLeft; nav.Controls.Add(note);
         root.Controls.Add(nav, 0, 1); root.SetRowSpan(nav, 2); root.Controls.Add(_workspace, 1, 1); _status.Padding = new Padding(24, 0, 0, 0); root.Controls.Add(_status, 1, 2); Controls.Add(root);
         _pages = [SegmentPage(), ProofPage(), SearchPage()]; Navigate(0);
+        _segmentInput.TextChanged += (_, _) => SegmentChanged(); _segmentMode.SelectedIndexChanged += (_, _) => SegmentChanged();
         Shown += async (_, _) => await InitializeShowcase(); FormClosing += (_, _) => _job?.Cancel();
     }
 
@@ -111,7 +113,11 @@ internal sealed class MainForm : Form
         var buttons = Theme.Toolbar(); var load = Theme.Button("导入 word2vec", false, 150); load.Click += async (_, _) => await LoadModel(); buttons.Controls.Add(load); var unload = Theme.Button("卸载", false, 70); unload.Click += (_, _) => { _model = null; _modelLabel.Text = "未加载词向量模型"; _vectorGrid.Rows.Clear(); }; buttons.Controls.Add(unload); model.Controls.Add(buttons, 0, 1);
         var query = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 }; query.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); query.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 102)); query.Controls.Add(_vectorQuery, 0, 0); var nearest = Theme.Button("语义近邻", false, 95); nearest.Click += async (_, _) => await Nearest(); query.Controls.Add(nearest, 1, 0); model.Controls.Add(query, 0, 2); model.Controls.Add(_vectorGrid, 0, 3);
         model.Controls.Add(Theme.Label("支持 UTF-8 文本 / 二进制模型；只导入你有权使用的文件。\n默认不附带预训练模型。", 8.5f, Theme.Muted), 0, 4); right.Controls.Add(Theme.Card("词向量工作台", model), 0, 1); split.Controls.Add(right, 1, 0); table.Controls.Add(split, 0, 2);
-        _issuesGrid.SelectionChanged += (_, _) => SelectIssue(); _proofInput.TextChanged += (_, _) => { if (!_loadingProof) { _proof = null; _issuesGrid.Rows.Clear(); _proofDetails.Text = "原文已改变。点击“检查文本”生成当前文本的建议。"; } }; panel.Controls.Add(table); return panel;
+        _issuesGrid.SelectionChanged += (_, _) => SelectIssue(); _proofInput.TextChanged += (_, _) =>
+        {
+            if (_loadingProof) return; _proof = null; _issuesGrid.Rows.Clear(); _proofDetails.Text = "原文已改变。点击“检查文本”生成当前文本的建议。";
+            _loadingProof = true; int start = _proofInput.SelectionStart, length = _proofInput.SelectionLength; _proofInput.SelectAll(); _proofInput.SelectionColor = Theme.Text; _proofInput.Select(start, length); _loadingProof = false;
+        }; panel.Controls.Add(table); return panel;
     }
     private Panel SearchPage()
     {
@@ -122,7 +128,12 @@ internal sealed class MainForm : Form
         var searchRow = Theme.Toolbar(); _keyword.Width = 200; _keyword.Dock = DockStyle.None; _keyword.PlaceholderText = "关键词"; searchRow.Controls.Add(_keyword); var start = Theme.Button("开始检索", true, 110); start.Click += async (_, _) => await Search(); searchRow.Controls.Add(start); searchRow.Controls.Add(_ignoreCase);
         _extensions.Width = 200; _extensions.Dock = DockStyle.None; searchRow.Controls.Add(_extensions); var mb = Theme.Label("MiB/文件", 8, Theme.Muted); mb.Dock = DockStyle.None; mb.Size = new Size(70, 38); searchRow.Controls.Add(mb); searchRow.Controls.Add(_maxMb); var hits = Theme.Label("行上限", 8, Theme.Muted); hits.Dock = DockStyle.None; hits.Size = new Size(55, 38); searchRow.Controls.Add(hits); searchRow.Controls.Add(_maxHits); table.Controls.Add(searchRow, 0, 2);
         table.Controls.Add(Theme.Card("匹配结果", _hitsGrid, "一个匹配行显示一次；双击可在预览中查看，原始文件保持只读。"), 0, 3);
-        var preview = Rows((SizeType.Percent, 100), (SizeType.Absolute, 44)); preview.Controls.Add(_searchPreview, 0, 0); var actions = Theme.Toolbar(); var export = Theme.Button("导出结果 JSON", false, 150); export.Click += (_, _) => { if (_search is null) { SetStatus("请先完成一次搜索"); return; } SaveText(JsonSerializer.Serialize(_search, new JsonSerializerOptions { WriteIndented = true }), "search-results.json"); }; actions.Controls.Add(export); var openFolder = Theme.Button("打开所在目录", false, 135); openFolder.Click += (_, _) => { if (_hitsGrid.CurrentRow?.Tag is FileHit hit && Directory.Exists(Path.GetDirectoryName(hit.Path))) Process.Start(new ProcessStartInfo("explorer.exe", Path.GetDirectoryName(hit.Path)!) { UseShellExecute = true }); }; actions.Controls.Add(openFolder); preview.Controls.Add(actions, 0, 1); table.Controls.Add(Theme.Card("只读预览", preview), 0, 4);
+        var preview = Rows((SizeType.Percent, 100), (SizeType.Absolute, 44)); preview.Controls.Add(_searchPreview, 0, 0); var actions = Theme.Toolbar(); var export = Theme.Button("导出结果 JSON", false, 150); export.Click += (_, _) => { if (_search is null) { SetStatus("请先完成一次搜索"); return; } SaveText(JsonSerializer.Serialize(_search, new JsonSerializerOptions { WriteIndented = true }), "search-results.json"); }; actions.Controls.Add(export); var openFolder = Theme.Button("打开所在目录", false, 135); openFolder.Click += (_, _) => { if (SelectedHit() is FileHit hit && Directory.Exists(Path.GetDirectoryName(hit.Path))) Process.Start(new ProcessStartInfo("explorer.exe", Path.GetDirectoryName(hit.Path)!) { UseShellExecute = true }); }; actions.Controls.Add(openFolder); preview.Controls.Add(actions, 0, 1); table.Controls.Add(Theme.Card("只读预览", preview), 0, 4);
+        _hitsGrid.VirtualMode = true; _hitsGrid.CellValueNeeded += (_, e) =>
+        {
+            if (_search is null || e.RowIndex < 0 || e.RowIndex >= _search.Hits.Count) return; var hit = _search.Hits[e.RowIndex];
+            e.Value = e.ColumnIndex switch { 0 => Path.GetRelativePath(_searchRoot, hit.Path), 1 => hit.Line, 2 => hit.Snippet, 3 => hit.Encoding, _ => null };
+        };
         _hitsGrid.SelectionChanged += (_, _) => PreviewHit(); panel.Controls.Add(table); return panel;
     }
     private void Navigate(int page)
@@ -144,6 +155,10 @@ internal sealed class MainForm : Form
     {
         string text = _segmentInput.Text; var mode = (SegmentMode)_segmentMode.SelectedIndex;
         await Job("正在分词", async cancellation => { var result = await Task.Run(() => _segmenter.Segment(text, mode, cancellation: cancellation), cancellation); _segments = result; ShowSegments(result); SetStatus($"分词完成 · {result.Tokens.Count:N0} 个词元 · {result.Frequencies.Count:N0} 个不同词语"); });
+    }
+    private void SegmentChanged()
+    {
+        if (_segments is null) return; _segmentNote.Text = "输入或模式已改变；点击开始分词更新结果。"; if (_job is null) SetStatus("当前输入尚未分析 · 下方保留上次结果");
     }
     private void ShowSegments(SegmentResult result)
     {
@@ -189,19 +204,20 @@ internal sealed class MainForm : Form
     private async Task Search()
     {
         var options = new FileSearchOptions(_path.Text.Trim(), _keyword.Text, _extensions.Text, _ignoreCase.Checked, (TextEncodingChoice)_encoding.SelectedIndex, (long)_maxMb.Value * 1024 * 1024, (int)_maxHits.Value);
-        _hitsGrid.Rows.Clear();
+        _hitsGrid.RowCount = 0; _search = null; _searchPreview.Clear(); _searchRoot = options.Root;
         await Job("正在扫描文件", async cancellation => { var progress = new Progress<FileProgress>(p => SetStatus($"扫描 {p.Scanned:N0} 文件 · {p.MatchedFiles:N0} 匹配文件 · {p.Hits:N0} 行 · 跳过 {p.Skipped:N0} · {Path.GetFileName(p.Current)}")); var summary = await Task.Run(() => FileSearcher.Search(options, progress, cancellation), CancellationToken.None); _search = summary;
-            _hitsGrid.SuspendLayout(); foreach (var hit in summary.Hits) { int row = _hitsGrid.Rows.Add(Path.GetRelativePath(options.Root, hit.Path), hit.Line, hit.Snippet, hit.Encoding); _hitsGrid.Rows[row].Tag = hit; } _hitsGrid.ResumeLayout(); PreviewHit();
+            _hitsGrid.RowCount = summary.Hits.Count; PreviewHit();
             SetStatus($"{(summary.Cancelled ? "已取消" : "搜索完成")} · 扫描 {summary.Scanned:N0} 文件 · {summary.MatchedFiles:N0} 匹配文件 · {summary.Hits.Count:N0} 行 · 跳过 {summary.Skipped:N0}" + (summary.LimitReached ? " · 达到结果行上限" : ""));
             if (summary.Hits.Count == 0) _searchPreview.Text = "未找到匹配结果。" + (summary.Notes.Count > 0 ? "\n\n跳过明细：\n" + string.Join("\n", summary.Notes.Take(10)) : ""); });
     }
     private void PreviewHit()
     {
-        if (_hitsGrid.CurrentRow?.Tag is not FileHit hit) return;
+        if (SelectedHit() is not FileHit hit) return;
         // Only the captured matching line is previewed; selecting a result never loads arbitrary large files.
         _searchPreview.Text = $"{hit.Path}\n行 {hit.Line}  ·  {hit.Encoding}  ·  本行出现 {hit.Occurrences} 次\n\n{hit.Snippet}";
         int start = _searchPreview.Text.IndexOf(hit.Snippet, StringComparison.Ordinal); if (start >= 0) { _searchPreview.Select(start, hit.Snippet.Length); _searchPreview.SelectionColor = Theme.Accent; _searchPreview.Select(0, 0); }
     }
+    private FileHit? SelectedHit() => _search is not null && _hitsGrid.CurrentRow is { Index: >= 0 } row && row.Index < _search.Hits.Count ? _search.Hits[row.Index] : null;
     private async Task OpenText(RichTextBox editor)
     {
         using var dialog = new OpenFileDialog { Filter = "文本文件|*.txt;*.md;*.csv;*.log|所有文件|*.*" }; if (dialog.ShowDialog(this) != DialogResult.OK) return;

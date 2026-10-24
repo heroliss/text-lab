@@ -49,6 +49,8 @@ try
     Check("zero vector rejected", () => Throws<InvalidDataException>(() => WordVectors.Load(Write("zero.vec", "1 2\n坏 0 0\n"))));
     Check("duplicate words rejected", () => Throws<InvalidDataException>(() => WordVectors.Load(Write("duplicate.vec", "2 1\n坏 1\n坏 1\n"))));
     Check("model allocation guard", () => Throws<InvalidDataException>(() => WordVectors.Load(Write("huge.vec", "2000000 4096\n"))));
+    Check("model header line is bounded", () => Throws<InvalidDataException>(() => WordVectors.Load(Write("long-header.vec", new string('9', 10000)))));
+    Check("model data line is bounded", () => Throws<InvalidDataException>(() => WordVectors.Load(Write("long-data.vec", "1 1\nword " + new string('1', 10000)))));
     Check("binary little endian word2vec", () => { string path = Path.Combine(temporary, "small.bin"); using (var f = File.Create(path)) { f.Write(Encoding.UTF8.GetBytes("2 2\n中文 ")); using var w = new BinaryWriter(f, Encoding.UTF8, true); w.Write(3f); w.Write(4f); f.Write(Encoding.UTF8.GetBytes("\n相近 ")); w.Write(3f); w.Write(4f); } var m = WordVectors.Load(path); Assert(m.Count == 2 && m.Similarity("中文", "相近") > 0.999); });
     Check("truncated binary rejected", () => { string path = Path.Combine(temporary, "bad.bin"); File.WriteAllBytes(path, Encoding.UTF8.GetBytes("20 300\n")); Throws<InvalidDataException>(() => WordVectors.Load(path)); });
     string root = Path.Combine(temporary, "search"); Directory.CreateDirectory(root);

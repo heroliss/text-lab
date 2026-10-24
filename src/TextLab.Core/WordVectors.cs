@@ -57,12 +57,13 @@ public sealed class WordVectors
     }
     private static WordVectors ReadText(Stream stream, CancellationToken cancellation, IProgress<VectorProgress>? progress)
     {
-        using var reader = new StreamReader(stream, new UTF8Encoding(false, true)); var (count, dimensions) = Header(reader.ReadLine() ?? "");
+        using var reader = new StreamReader(stream, new UTF8Encoding(false, true)); var (count, dimensions) = Header(ReadBoundedLine(reader, 128, cancellation) ?? "");
         cancellation.ThrowIfCancellationRequested(); var map = new Dictionary<string, float[]>(Math.Min(count, 100_000), StringComparer.Ordinal);
         for (int n = 0; n < count; n++)
         {
-            cancellation.ThrowIfCancellationRequested(); string line = reader.ReadLine() ?? throw new InvalidDataException("模型被截断。");
+            cancellation.ThrowIfCancellationRequested(); string line = ReadBoundedLine(reader, 4096 + dimensions * 129, cancellation) ?? throw new InvalidDataException("模型被截断。");
             var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries); if (parts.Length != dimensions + 1) throw new InvalidDataException($"第 {n + 2} 行向量维数错误。");
+            if (parts[0].Length > 4096) throw new InvalidDataException($"第 {n + 2} 行词条过长。");
             var vector = new float[dimensions];
             for (int d = 0; d < dimensions; d++)
                 if (!float.TryParse(parts[d + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out vector[d])) throw new InvalidDataException($"第 {n + 2} 行不是浮点数。");
@@ -70,6 +71,19 @@ public sealed class WordVectors
             if (n % 512 == 0 || n == count - 1) progress?.Report(new(n + 1, count));
         }
         return new(map, dimensions);
+    }
+    private static string? ReadBoundedLine(TextReader reader, int maximumCharacters, CancellationToken cancellation)
+    {
+        var line = new StringBuilder(); int value;
+        while ((value = reader.Read()) >= 0)
+        {
+            if (line.Length % 1024 == 0) cancellation.ThrowIfCancellationRequested();
+            if (value == '\n') return line.ToString();
+            if (value == '\r') { if (reader.Peek() == '\n') reader.Read(); return line.ToString(); }
+            if (line.Length >= maximumCharacters) throw new InvalidDataException("模型中的单行过长，文件可能不是 word2vec 格式。");
+            line.Append((char)value);
+        }
+        return line.Length > 0 ? line.ToString() : null;
     }
     private static void Normalize(float[] vector)
     {
